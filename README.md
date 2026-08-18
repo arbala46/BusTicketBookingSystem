@@ -1,4 +1,4 @@
-# Smart Bus Ticket Booking System
+# Bus Ticket Booking System
 
 A production-inspired Bus Ticket Booking System developed using Java and Spring Boot. This project is designed to simulate how real-world online bus reservation platforms work while following clean architecture and REST API best practices.
 
@@ -52,6 +52,7 @@ A production-inspired Bus Ticket Booking System developed using Java and Spring 
 - Trip validation
 - Trip Seat validation
 - Seat availability validation
+- Gender-based seat allocation
 - Passenger details mapping
 - Booking confirmation
 - Available seat count update
@@ -100,7 +101,6 @@ Relationships
 
 ## Features Planned
 
-- Gender-based seat allocation
 - Booking cancellation
 - Booking history
 - Seat locking mechanism
