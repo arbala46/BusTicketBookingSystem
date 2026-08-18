@@ -7,11 +7,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import ticket_booking_system.ENUM.BookingStatus;
+import ticket_booking_system.ENUM.SeatPosition;
 import ticket_booking_system.ENUM.SeatStatus;
 import ticket_booking_system.dto.BookingRequestDTO;
 import ticket_booking_system.dto.BookingResponseDTO;
 import ticket_booking_system.dto.PassengerDTO;
 import ticket_booking_system.entity.*;
+import ticket_booking_system.exception.AdjacentSeatException;
+import ticket_booking_system.exception.BookingException;
 import ticket_booking_system.exception.TripNotFoundException;
 import ticket_booking_system.repository.bookingPassengerRepository;
 import ticket_booking_system.repository.bookingRepository;
@@ -50,23 +53,25 @@ public class BookingService {
            Object principal = authentication.getPrincipal();
            if(principal instanceof User) {
                user = (User) principal;
-           } else throw new RuntimeException("Authenticated principal is not a valid User.");
-       }else throw new RuntimeException("User is not authenticated.");
+           } else throw new BookingException("Authenticated principal is not a valid User.");
+       }else throw new BookingException("User is not authenticated.");
 
         Trip trip = tripRepository.findById(bookingRequestDTO.getTripId())
                 .orElseThrow(()->{
                     log.error("Trip Id {} not found",bookingRequestDTO.getTripId());
-                     return new TripNotFoundException("TripId" + bookingRequestDTO.getTripId()+" not found");
+                     return new TripNotFoundException("TripId " + bookingRequestDTO.getTripId()+" not found");
                 });
 
         if(bookingRequestDTO.getPassengers()==null || bookingRequestDTO.getPassengers().isEmpty())
         {
-            throw new RuntimeException("Passenger list is empty");
+            log.error("Passenger list is empty");
+            throw new BookingException("Passenger list is empty");
         }
 
         if(trip.getAvailableSeats()<bookingRequestDTO.getPassengers().size())
         {
-            throw new RuntimeException("No Available Seats");
+            log.error("No Available Seats");
+            throw new BookingException("No Available Seats");
         }
 
         Set<Long> SeatIds = new HashSet<>();
@@ -74,7 +79,8 @@ public class BookingService {
         {
             if(!SeatIds.add(passenger.getTripSeatId()))
             {
-                throw new RuntimeException(passenger.getTripSeatId()+" is duplicate");
+                log.error("Seat ID "+passenger.getTripSeatId()+" is duplicate");
+                throw new BookingException("Seat ID "+passenger.getTripSeatId()+" is duplicate");
             }
 
         }
@@ -85,7 +91,7 @@ public class BookingService {
             TripSeat tripSeat = tripSeatRepository.findById(passenger.getTripSeatId()).
                     orElseThrow(()->{
                         log.error("Trip SeatId {} not found",passenger.getTripSeatId());
-                        return new RuntimeException("TripSeatId" + passenger.getTripSeatId()+" not found");
+                        return new BookingException("TripSeatId     " + passenger.getTripSeatId()+" not found");
                     });
             tripSeatMap.put(tripSeat.getId(),tripSeat);
         }
@@ -95,15 +101,18 @@ public class BookingService {
                 Long SeatId = passenger.getTripSeatId();
                 if(!tripSeatMap.get(SeatId).getTrip().getId().equals(trip.getId()))
                 {
-                    throw new RuntimeException(tripSeatMap.get(SeatId).getId()+" this TripSeat is not belongs to "+trip.getId()+" this trip");
+                    log.error(tripSeatMap.get(SeatId).getId()+" this TripSeat is not belongs to "+trip.getId()+" this trip");
+                    throw new BookingException(tripSeatMap.get(SeatId).getId()+" this TripSeat is not belongs to "+trip.getId()+" this trip");
                 }
 
                 if(tripSeatMap.get(SeatId).getSeatStatus()!= SeatStatus.AVAILABLE)
                 {
-                    throw new RuntimeException("Selected seat is already booked. Please choose another seat.");
+                    log.error("Selected seat is already booked. Please choose another seat.");
+                    throw new BookingException("Selected seat is already booked. Please choose another seat.");
                 }
         }
 
+        validateGenderBasedSeatAllocation(bookingRequestDTO ,tripSeatMap);
 
         Booking booking = new Booking();
         booking.setBookingTime(LocalDateTime.now());
@@ -163,6 +172,63 @@ public class BookingService {
 
 
         return bookingResponse;
+    }
+
+    public void validateGenderBasedSeatAllocation(BookingRequestDTO request , Map<Long,TripSeat> tripSeatMap)
+    {
+
+        List<TripSeat> tripSeats = tripSeatRepository.findByTripId(request.getTripId());
+
+        for(PassengerDTO passenger : request.getPassengers())
+        {
+            TripSeat CurrentSeat = tripSeatMap.get(passenger.getTripSeatId());
+            SeatPosition seatPosition = CurrentSeat.getSeat().getSeatPosition();
+            List<SeatPosition> adjacentPositions = new ArrayList<>();
+
+            switch (seatPosition)
+            {
+                case LEFT_WINDOW -> adjacentPositions.add(SeatPosition.LEFT_MIDDLE);
+                case LEFT_MIDDLE -> {
+                    adjacentPositions.add(SeatPosition.LEFT_WINDOW);
+                    adjacentPositions.add(SeatPosition.LEFT_AISLE);
+                }
+                case LEFT_AISLE -> adjacentPositions.add(SeatPosition.LEFT_MIDDLE);
+                case RIGHT_WINDOW -> adjacentPositions.add(SeatPosition.RIGHT_MIDDLE);
+                case RIGHT_MIDDLE -> {
+                    adjacentPositions.add(SeatPosition.RIGHT_WINDOW);
+                    adjacentPositions.add(SeatPosition.RIGHT_AISLE);
+                }
+                case RIGHT_AISLE -> adjacentPositions.add(SeatPosition.RIGHT_MIDDLE);
+            }
+
+            for(SeatPosition adjacentPosition : adjacentPositions)
+            {
+                for(TripSeat ts : tripSeats)
+                {
+                    if(ts.getSeat().getSeatRow() == CurrentSeat.getSeat().getSeatRow() &&
+                       ts.getSeat().getSeatPosition() == adjacentPosition)
+                    {
+                        if(ts.getSeatStatus()!=SeatStatus.AVAILABLE)
+                        {
+                            BookingPassenger bookingPassenger = bookingPassengerRepository.findByTripSeatId(ts.getId());
+                            if(bookingPassenger != null && bookingPassenger.getGender() != passenger.getGender())
+                            {
+                                log.error("Adjacent Seat is booked by "
+                                        + bookingPassenger.getGender()+" Kindly book another seat!");
+                                throw new AdjacentSeatException("Adjacent Seat is booked by "
+                                        + bookingPassenger.getGender()+" Kindly book another seat!");
+                            }
+                        }
+                    }
+                }
+
+            }
+
+
+        }
+
+
+
     }
 
 }
