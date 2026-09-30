@@ -59,6 +59,18 @@ A production-inspired Bus Ticket Booking System developed using Java and Spring 
 - Dummy payment simulation
 - Transaction management using @Transactional
 
+### Booking Cancellation
+
+- Full booking cancellation
+- Partial booking cancellation
+- Cancel selected passengers from an existing booking
+- Cancellation validation
+- Booking status management
+- Passenger status management
+- Seat availability restoration after cancellation
+- Available seat count update
+- Transaction management using `@Transactional`
+
 ---
 
 ## Database Design
@@ -82,6 +94,18 @@ Relationships
 - One Booking → Many BookingPassengers
 - One BookingPassenger → One TripSeat
 
+### Booking & Cancellation Status
+
+Booking and passenger cancellation states are managed using status fields in the existing database tables instead of creating separate cancellation tables.
+
+This allows the system to support:
+
+- Active bookings
+- Fully cancelled bookings
+- Partially cancelled bookings
+- Cancelled passengers
+- Available seats after cancellation
+
 ---
 
 ## REST APIs
@@ -96,12 +120,13 @@ Relationships
 
 ### Booking
 - Book Tickets
+- Cancel Booking
+- Partially Cancel Booking
 
 ---
 
 ## Features Planned
 
-- Booking cancellation
 - Booking history
 - Seat locking mechanism
 - Race condition handling
@@ -130,10 +155,6 @@ The objective of this project is to build a production-inspired backend applicat
 ---
 
 ## Author
-
-**Bala A.R.**
-
-Java Backend Developer
 
 **Bala A.R.**
 
