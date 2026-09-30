@@ -7,15 +7,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import ticket_booking_system.ENUM.BookingStatus;
+import ticket_booking_system.ENUM.PassengerStatus;
 import ticket_booking_system.ENUM.SeatPosition;
 import ticket_booking_system.ENUM.SeatStatus;
-import ticket_booking_system.dto.BookingRequestDTO;
-import ticket_booking_system.dto.BookingResponseDTO;
-import ticket_booking_system.dto.PassengerDTO;
+import ticket_booking_system.dto.*;
 import ticket_booking_system.entity.*;
-import ticket_booking_system.exception.AdjacentSeatException;
-import ticket_booking_system.exception.BookingException;
-import ticket_booking_system.exception.TripNotFoundException;
+import ticket_booking_system.exception.*;
 import ticket_booking_system.repository.bookingPassengerRepository;
 import ticket_booking_system.repository.bookingRepository;
 import ticket_booking_system.repository.tripRepository;
@@ -132,10 +129,11 @@ public class BookingService {
             bookingPassenger.setAge(passenger.getAge());
             bookingPassenger.setGender(passenger.getGender());
             bookingPassenger.setTripSeat(tripseat);
+            bookingPassenger.setPassengerStatus(PassengerStatus.CONFIRMED);
             passengerList.add(bookingPassenger);
         }
 
-        BigDecimal totalAmt = new BigDecimal(0);
+        BigDecimal totalAmt = BigDecimal.ZERO;
         try{
             totalAmt = trip.getBus().getFare().multiply(new BigDecimal(passengerList.size()));
             log.info("Total payable amount: "+totalAmt);
@@ -227,7 +225,185 @@ public class BookingService {
 
         }
 
+    }
 
+    public List<BookedPassengerResponseDTO> getBookedPassengers(Long bookingId)
+    {
+        List<BookingPassenger> bookedPassengersList = bookingPassengerRepository.findByBookingId(bookingId);
+        List<BookedPassengerResponseDTO> response = new ArrayList<>();
+
+       for(BookingPassenger passenger : bookedPassengersList)
+       {
+           BookedPassengerResponseDTO passengerResponse = new BookedPassengerResponseDTO();
+           passengerResponse.setId(passenger.getId());
+           passengerResponse.setPassengerName(passenger.getPassengerName());
+           passengerResponse.setAge(passenger.getAge());
+           passengerResponse.setPassengerStatus(passenger.getPassengerStatus());
+           passengerResponse.setGender(passenger.getGender());
+           passengerResponse.setTripSeat_Id(passenger.getTripSeat().getId());
+           passengerResponse.setSeatNumber(passenger.getTripSeat().getSeat().getSeatNumber());
+           response.add(passengerResponse);
+       }
+
+        return response;
+    }
+
+
+    @Transactional
+    public BookingCancellationResponseDTO fullBookingCancellation(Long bookingId)
+    {
+
+        Booking booking = bookingRepository.findById(bookingId).
+                orElseThrow(()->new BookingNotFoundException(bookingId+" is not valid!"));
+
+        Authentication authentication =  SecurityContextHolder.getContext().getAuthentication();
+
+        User user;
+        if(authentication!=null && authentication.isAuthenticated())
+        {
+            Object principal = authentication.getPrincipal();
+            if(principal instanceof User) {
+                user = (User) principal;
+                if(!user.getEmail().equals(booking.getUser().getEmail()))
+                {
+                    throw new InvalidCredentialsException("Invalid user is deleting!");
+                }
+            } else throw new InvalidCredentialsException("Authenticated principal is not a valid User.");
+        }else throw new InvalidCredentialsException("User is not authenticated.");
+
+        if(booking.getBookingStatus() == BookingStatus.CANCELLED)
+        {
+            throw new BookingException("This booking is already cancelled!");
+        }
+
+        List<BookingPassenger> bookedPassengersList = bookingPassengerRepository.findByBookingId(bookingId);
+
+        if(bookedPassengersList.size()==0)
+        {
+            throw new BookingException("No passengers are available under this booking!");
+        }
+
+        List<TripSeat> tripSeatList = new ArrayList<>();
+        Trip trip = booking.getTrip();
+
+        for(BookingPassenger bookedPassenger : bookedPassengersList)
+        {
+            TripSeat ts = bookedPassenger.getTripSeat();
+            ts.setSeatStatus(SeatStatus.AVAILABLE);
+            tripSeatList.add(ts);
+            bookedPassenger.setPassengerStatus(PassengerStatus.CANCELLED);
+        }
+
+        Long updatedSeatCount = trip.getAvailableSeats()+bookedPassengersList.size();
+        trip.setAvailableSeats(updatedSeatCount);
+        booking.setBookingStatus(BookingStatus.CANCELLED);
+        booking.setCancelledAt(LocalDateTime.now());
+        tripSeatRepository.saveAll(tripSeatList);
+        bookingPassengerRepository.saveAll(bookedPassengersList);
+        tripRepository.save(trip);
+        bookingRepository.save(booking);
+
+        BookingCancellationResponseDTO bookingCancellationResponseDTO = new BookingCancellationResponseDTO();
+        bookingCancellationResponseDTO.setBookingStatus(BookingStatus.CANCELLED);
+        bookingCancellationResponseDTO.setPassengersCount((long) bookedPassengersList.size());
+        bookingCancellationResponseDTO.setMessage("Your Tickets has been cancelled successfully!");
+        bookingCancellationResponseDTO.setCancelledAt(booking.getCancelledAt());
+
+        return bookingCancellationResponseDTO;
+
+    }
+
+
+    @Transactional
+    public BookingCancellationResponseDTO partialCancellation(Long bookingId, PartialCancellationRequestDTO partialCancellationRequestDTO)
+    {
+        Booking booking = bookingRepository.findById(bookingId).
+                orElseThrow(()->new BookingNotFoundException("BookingId "+bookingId+" is not valid!"));
+
+        Authentication authentication =  SecurityContextHolder.getContext().getAuthentication();
+
+        User user;
+        if(authentication!=null && authentication.isAuthenticated())
+        {
+            Object principal = authentication.getPrincipal();
+            if(principal instanceof User) {
+                user = (User) principal;
+                if(!user.getEmail().equals(booking.getUser().getEmail()))
+                {
+                    throw new InvalidCredentialsException("Invalid user is deleting!");
+                }
+            } else throw new InvalidCredentialsException("Authenticated principal is not a valid User.");
+        }else throw new InvalidCredentialsException("User is not authenticated.");
+
+        if(booking.getBookingStatus()==BookingStatus.CANCELLED)
+        {
+            throw new BookingException(bookingId+" This Booking is already in cancelled!");
+        }
+
+        List<BookingPassenger> bookingPassengerList = bookingPassengerRepository.findByBookingId(bookingId);
+
+        Trip trip = booking.getTrip();
+
+        List<TripSeat> tripSeatList = new ArrayList<>();
+
+        Set<Long> passengersIds = partialCancellationRequestDTO.getPassengersIds();
+
+        if(passengersIds==null || passengersIds.isEmpty())
+        {
+            throw new BookingException("No passenger IDs were provided!");
+        }
+
+        Long updatedSeatsCount = 0L;
+        boolean hasConfirmedPassenger = false;
+
+        for(Long passengerId : passengersIds)
+        {
+
+            BookingPassenger bp = bookingPassengerList.stream().filter(x->x.getId().equals(passengerId)).findFirst()
+                    .orElseThrow(()->new BookingException(passengerId+ " passengerId is not valid!"));
+
+            if(bp.getPassengerStatus()==PassengerStatus.CANCELLED)
+            {
+                throw new BookingException("Passenger ticket is already in cancelled!");
+            }
+
+            TripSeat ts = bp.getTripSeat();
+            ts.setSeatStatus(SeatStatus.AVAILABLE);
+            bp.setPassengerStatus(PassengerStatus.CANCELLED);
+            updatedSeatsCount++;
+            tripSeatList.add(ts);
+        }
+
+        trip.setAvailableSeats(trip.getAvailableSeats()+updatedSeatsCount);
+
+        for(BookingPassenger bp : bookingPassengerList)
+        {
+            if(bp.getPassengerStatus()==PassengerStatus.CONFIRMED)
+            {
+                hasConfirmedPassenger = true;
+                break;
+            }
+        }
+
+        if(!hasConfirmedPassenger)
+        {
+            booking.setBookingStatus(BookingStatus.CANCELLED);
+            booking.setCancelledAt(LocalDateTime.now());
+        }
+
+        bookingPassengerRepository.saveAll(bookingPassengerList);
+        tripSeatRepository.saveAll(tripSeatList);
+        tripRepository.save(trip);
+        bookingRepository.save(booking);
+
+        BookingCancellationResponseDTO bookingCancellationResponseDTO = new BookingCancellationResponseDTO();
+        bookingCancellationResponseDTO.setBookingStatus(booking.getBookingStatus());
+        bookingCancellationResponseDTO.setPassengersCount(updatedSeatsCount);
+        bookingCancellationResponseDTO.setMessage("Your Tickets has been cancelled successfully!");
+        bookingCancellationResponseDTO.setCancelledAt(booking.getCancelledAt());
+
+
+        return bookingCancellationResponseDTO;
 
     }
 

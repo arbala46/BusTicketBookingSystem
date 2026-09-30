@@ -63,7 +63,7 @@ public class TripService {
             Trip trip = new Trip();
             trip.setBus(bus);
             trip.setJourneyDate(currentDate);
-            trip.setAvailableSeats(bus.getTotalSeats());
+            trip.setAvailableSeats((long) bus.getTotalSeats());
             if(tripRepository.existsByBusAndJourneyDate(bus,currentDate))
             {
                 currentDate = currentDate.plusDays(1);

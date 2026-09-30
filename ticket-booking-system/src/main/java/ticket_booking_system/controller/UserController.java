@@ -8,9 +8,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import ticket_booking_system.dto.LoginResponseDTO;
+import ticket_booking_system.dto.UserResponseDTO;
 import ticket_booking_system.entity.User;
 import ticket_booking_system.service.JwtService;
 import ticket_booking_system.service.UserService;
+
+import java.util.List;
 
 @RestController
 public class UserController {
@@ -38,9 +41,9 @@ public class UserController {
     }
 
     @GetMapping("/users/getUsersList")
-    public void usersList()
+    public List<UserResponseDTO> usersList()
     {
-        System.out.println("It's Working");
+        return userService.UsersList();
     }
 
 }

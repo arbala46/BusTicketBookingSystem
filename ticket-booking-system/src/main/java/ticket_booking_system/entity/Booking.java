@@ -22,6 +22,8 @@ public class Booking {
 
     private LocalDateTime bookingTime;
 
+    private LocalDateTime cancelledAt;
+
     @Enumerated(EnumType.STRING)
     private BookingStatus bookingStatus;
 

@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ticket_booking_system.ENUM.Gender;
+import ticket_booking_system.ENUM.PassengerStatus;
 
 @Data
 @NoArgsConstructor
@@ -22,7 +23,7 @@ public class BookingPassenger {
     @JoinColumn(name = "booking_id")
     private Booking booking;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "trip_seat_id")
     private TripSeat tripSeat;
 
@@ -32,5 +33,8 @@ public class BookingPassenger {
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
+
+    @Enumerated(EnumType.STRING)
+    private PassengerStatus passengerStatus;
 
 }

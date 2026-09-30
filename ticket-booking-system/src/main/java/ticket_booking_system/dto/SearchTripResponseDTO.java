@@ -26,7 +26,7 @@ public class SearchTripResponseDTO {
 
     private LocalTime arrivalTime;
 
-    private Integer availableSeats;
+    private Long availableSeats;
 
     private BigDecimal fare;
 

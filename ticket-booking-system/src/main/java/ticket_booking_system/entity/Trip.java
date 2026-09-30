@@ -23,6 +23,6 @@ public class Trip {
 
     private LocalDate journeyDate;
 
-    private Integer availableSeats;
+    private Long availableSeats;
 
 }

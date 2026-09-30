@@ -108,4 +108,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
+    @ExceptionHandler(BookingNotFoundException.class)
+    public ResponseEntity<Object> handleBookingNotFoundException(BookingNotFoundException ex)
+    {
+
+        ErrorResponse errorResponse =  new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                ex.getMessage()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
 }

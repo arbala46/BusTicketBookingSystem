@@ -4,11 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import ticket_booking_system.dto.UserResponseDTO;
 import ticket_booking_system.entity.User;
 import ticket_booking_system.exception.InvalidCredentialsException;
 import ticket_booking_system.exception.UserAlreadyExistsException;
 import ticket_booking_system.exception.UserNotFoundException;
 import ticket_booking_system.repository.userRepository;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -55,4 +59,21 @@ public class UserService {
         log.info("Invalid Credentials");
         throw new InvalidCredentialsException("Invalid Credentials");
     }
+
+    public List<UserResponseDTO> UsersList()
+    {
+        List<User> userList = userRepository.findAll();
+        List<UserResponseDTO> userResponse = new ArrayList<>();
+
+        for(User user : userList)
+        {
+            UserResponseDTO responseDTO = new UserResponseDTO();
+            responseDTO.setName(user.getName());
+            responseDTO.setEmail(user.getEmail());
+            responseDTO.setGender(user.getGender());
+            userResponse.add(responseDTO);
+        }
+        return userResponse;
+    }
+
 }
