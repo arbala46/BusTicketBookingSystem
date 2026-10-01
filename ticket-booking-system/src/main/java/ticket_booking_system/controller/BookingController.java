@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ticket_booking_system.dto.*;
-import ticket_booking_system.entity.BookingPassenger;
 import java.util.*;
 import ticket_booking_system.service.BookingService;
 
@@ -38,6 +37,12 @@ public class BookingController {
     public ResponseEntity<BookingCancellationResponseDTO> partialCancellation(@PathVariable Long bookingId, @RequestBody PartialCancellationRequestDTO partialCancellationRequestDTO)
     {
         return ResponseEntity.ok(bookingService.partialCancellation(bookingId,partialCancellationRequestDTO));
+    }
+
+    @GetMapping("/bookingHistory")
+    public ResponseEntity<List<BookingHistoryResponseDTO>> bookingHistory()
+    {
+        return ResponseEntity.ok(bookingService.bookingHistory());
     }
 
 }

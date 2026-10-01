@@ -36,7 +36,7 @@ public class Booking {
     private Trip trip;
 
     @OneToMany(mappedBy = "booking")
-    private List<BookingPassenger> passengers;
+    private List<BookingPassenger> bookingPassengers;
 
 
 
